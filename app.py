@@ -1,10 +1,22 @@
+import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-def analyze_agent_times(csv_path):
-    # Read the CSV file
-    df = pd.read_csv(csv_path)
-    
+# Page config
+st.set_page_config(
+    page_title="Agent Login Analysis Tool",
+    layout="wide"
+)
+
+# Title and description
+st.title("Agent Login Analysis Tool")
+st.write("Upload your CSV file containing agent login and ready times.")
+
+def analyze_agent_times(df):
+    """
+    Analyze agent login and ready times from a DataFrame.
+    Returns a DataFrame with analysis results.
+    """
     # Convert TIME column to datetime
     df['TIME'] = pd.to_datetime(df['TIME'], format='%H:%M:%S').dt.time
     
@@ -59,28 +71,65 @@ def analyze_agent_times(csv_path):
                     'Time to Ready (seconds)': diff_seconds,
                     'Time to Ready': f'{diff_seconds // 60} minutes, {diff_seconds % 60} seconds'
                 })
+    
     # Convert results to DataFrame and sort by agent name alphabetically
     results_df = pd.DataFrame(results)
     results_df = results_df.sort_values('Agent')
     
     return results_df
 
-# Example usage:
-if __name__ == "__main__":
-    csv_path = 'agent-details.csv'
-    results = analyze_agent_times(csv_path)
-    
-    # Print results
-    pd.set_option('display.max_rows', None)
-    print("\nAgent Login to Ready Time Analysis:")
-    print("====================================")
-    print(results[['Agent', 'First Login', 'First Ready', 'Time to Ready']])
-    
-    # Print summary statistics
-    print("\nSummary Statistics:")
-    print("==================")
-    times = results['Time to Ready (seconds)']
-    print(f"Average time to ready: {times.mean():.1f} seconds")
-    print(f"Minimum time to ready: {times.min():.1f} seconds")
-    print(f"Maximum time to ready: {times.max():.1f} seconds")
-    print(f"Median time to ready: {times.median():.1f} seconds")
+# File uploader
+uploaded_file = st.file_uploader("Choose a CSV file", type=['csv'])
+
+if uploaded_file is not None:
+    try:
+        # Read the uploaded file
+        df = pd.read_csv(uploaded_file)
+        
+        # Run analysis
+        results = analyze_agent_times(df)
+        
+        # Display results
+        st.subheader("Analysis Results")
+        st.dataframe(results[['Agent', 'First Login', 'First Ready', 'Time to Ready']])
+        
+        # Display summary statistics
+        st.subheader("Summary Statistics")
+        times = results['Time to Ready (seconds)']
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Average time", f"{times.mean():.1f} seconds")
+        with col2:
+            st.metric("Minimum time", f"{times.min():.1f} seconds")
+        with col3:
+            st.metric("Maximum time", f"{times.max():.1f} seconds")
+        with col4:
+            st.metric("Median time", f"{times.median():.1f} seconds")
+            
+        # Add download button for results
+        csv = results.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            "Download Results",
+            csv,
+            "agent_analysis_results.csv",
+            "text/csv",
+            key='download-csv'
+        )
+        
+    except Exception as e:
+        st.error(f"Error processing file: {str(e)}")
+        st.write("Please ensure your CSV file contains the required columns (AGENT, TIME, STATE) "
+                "and the data is in the correct format.")
+else:
+    st.info("Please upload a CSV file to begin analysis.")
+    st.markdown("""
+    ### Sample CSV Format:
+    ```
+    AGENT,TIME,STATE
+    Agent1,09:00:00,Login
+    Agent1,09:05:30,Ready
+    Agent2,09:15:00,Login
+    Agent2,09:20:45,Ready
+    ```
+    """)
